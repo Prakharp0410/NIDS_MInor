@@ -49,8 +49,21 @@ ATTACK_TYPES = {
 }
 
 CLASS_LABELS = {
-    0: "BENIGN", 1: "DoS", 2: "DDoS", 3: "PortScan",
-    4: "BruteForce", 5: "Botnet", 6: "WebAttack", 7: "Infiltration",
+    0: "Benign",
+    1: "Bot",
+    2: "DDoS",
+    3: "DoS GoldenEye",
+    4: "DoS Hulk",
+    5: "DoS Slowhttptest",
+    6: "DoS slowloris",
+    7: "FTP-Patator",
+    8: "Heartbleed",
+    9: "Infiltration",
+    10: "PortScan",
+    11: "SSH-Patator",
+    12: "Web Attack Brute Force",
+    13: "Web Attack SQL Injection",
+    14: "Web Attack XSS",
 }
 
 # ===========================
