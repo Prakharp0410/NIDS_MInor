@@ -22,11 +22,11 @@ class InferenceEngine:
     def _load_all(self):
         models_dir = Path(__file__).parent.parent / "models"
         try:
-            self.model = joblib.load(models_dir / "model.joblib")
-            self.scaler = joblib.load(models_dir / "scaler.joblib")
-            self.label_encoder = joblib.load(models_dir / "label_encoder.joblib")
+            self.model = joblib.load(models_dir / "rf_model.joblib")
+            self.scaler = joblib.load(models_dir / "rf_scaler.joblib")
+            self.label_encoder = joblib.load(models_dir / "rf_label_encoder.joblib")
 
-            with open(models_dir / "features.json") as f:
+            with open(models_dir / "rf_features.json") as f:
                 cfg = json.load(f)
             self.expected_features = len(cfg.get("features", []))
 
