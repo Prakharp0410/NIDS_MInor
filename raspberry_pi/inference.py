@@ -1,9 +1,9 @@
-# raspberry_pi/inference.py  — FIXED VERSION
-# Key change: pads live features to match model's expected 77 features
+# raspberry_pi/inference.py — FIXED VERSION
 
 import numpy as np
 import joblib
 import json
+import pandas as pd
 from pathlib import Path
 import sys
 
@@ -15,7 +15,8 @@ class InferenceEngine:
         self.model = None
         self.scaler = None
         self.label_encoder = None
-        self.expected_features = 77   # what your Colab model was trained on
+        self.feature_names = None
+        self.expected_features = 77
         self.is_ready = False
         self._load_all()
 
@@ -28,8 +29,14 @@ class InferenceEngine:
 
             with open(models_dir / "rf_features.json") as f:
                 cfg = json.load(f)
-            self.expected_features = len(cfg.get("features", []))
 
+            # Handle both formats: plain list OR {"features": [...]}
+            if isinstance(cfg, list):
+                self.feature_names = cfg
+            else:
+                self.feature_names = cfg.get("features", [])
+
+            self.expected_features = len(self.feature_names)
             self.is_ready = True
             log_runtime(f"✅ Model ready — expects {self.expected_features} features, "
                         f"{len(self.label_encoder.classes_)} classes")
@@ -37,40 +44,33 @@ class InferenceEngine:
             log_error("Failed to load model files", e)
 
     def _pad_features(self, features: np.ndarray) -> np.ndarray:
-        """Pad or truncate feature vector to match model input size."""
         current = len(features)
         if current == self.expected_features:
             return features
         elif current < self.expected_features:
-            # Pad with zeros for missing features
             padded = np.zeros(self.expected_features, dtype=np.float32)
             padded[:current] = features
             return padded
         else:
-            # Truncate if somehow more
             return features[:self.expected_features]
 
     def is_attack(self, features: np.ndarray, threshold: float = 0.5):
-        """
-        Returns (is_attack, class_name, confidence)
-        """
         if not self.is_ready:
             return False, "UNKNOWN", 0.0
         try:
             features = self._pad_features(features)
-            features_2d = features.reshape(1, -1)
 
-            # Scale
-            scaled = self.scaler.transform(features_2d)
+            # Wrap in DataFrame with correct column names to suppress warning
+            if self.feature_names:
+                features_df = pd.DataFrame([features], columns=self.feature_names)
+                scaled = self.scaler.transform(features_df)
+            else:
+                scaled = self.scaler.transform(features.reshape(1, -1))
 
-            # Predict
             pred_class = int(self.model.predict(scaled)[0])
             probas = self.model.predict_proba(scaled)[0]
             confidence = float(probas[pred_class])
-
-            # Get human-readable name
             class_name = self.label_encoder.inverse_transform([pred_class])[0]
-
             is_malicious = (pred_class != 0) and (confidence >= threshold)
             return is_malicious, pred_class, confidence
 
@@ -79,7 +79,6 @@ class InferenceEngine:
             return False, 0, 0.0
 
     def get_class_name(self, class_id: int) -> str:
-        """Convert class number to attack name."""
         try:
             return self.label_encoder.inverse_transform([class_id])[0]
         except:
