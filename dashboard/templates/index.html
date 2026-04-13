@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIDS Dashboard - Network Intrusion Detection System</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ Network Intrusion Detection System - Dashboard</h1>
+            <p>Real-time Attack Detection & Threat Analysis</p>
+        </header>
+
+        <nav class="navbar">
+            <ul>
+                <li><a href="#dashboard">Dashboard</a></li>
+                <li><a href="#alerts">Alerts</a></li>
+                <li><a href="#stats">Statistics</a></li>
+            </ul>
+        </nav>
+
+        <main>
+            <!-- Health Status -->
+            <section class="card health-card">
+                <h2>System Status</h2>
+                <div id="health-status" class="status-indicator">
+                    <span class="status-light" id="status-light"></span>
+                    <span id="status-text">Checking...</span>
+                </div>
+                <p id="status-time" class="timestamp"></p>
+            </section>
+
+            <!-- Statistics Dashboard -->
+            <section class="stats-grid">
+                <div class="card stat-card">
+                    <h3>Total Attack Alerts</h3>
+                    <div class="stat-value" id="total-alerts">0</div>
+                    <p class="stat-label">Detected Attacks</p>
+                </div>
+                <div class="card stat-card">
+                    <h3>Alerts Last Hour</h3>
+                    <div class="stat-value" id="alerts-last-hour">0</div>
+                    <p class="stat-label">Recent Activity</p>
+                </div>
+                <div class="card stat-card">
+                    <h3>High Severity</h3>
+                    <div class="stat-value danger" id="severity-high">0</div>
+                    <p class="stat-label">Confidence ≥ 80%</p>
+                </div>
+                <div class="card stat-card">
+                    <h3>Medium Severity</h3>
+                    <div class="stat-value warning" id="severity-medium">0</div>
+                    <p class="stat-label">Confidence 50-80%</p>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section id="charts-section" class="charts-section">
+                <div class="charts-grid">
+                    <div class="card chart-card">
+                        <h2>Attack Type Distribution</h2>
+                        <canvas id="attackTypeChart" height="80"></canvas>
+                    </div>
+                    <div class="card chart-card">
+                        <h2>Severity Levels</h2>
+                        <canvas id="severityChart" height="80"></canvas>
+                    </div>
+                    <div class="card chart-card">
+                        <h2>Protocol Analysis</h2>
+                        <canvas id="protocolChart" height="80"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recent Alerts Table -->
+            <section class="card alerts-section">
+                <h2>Recent Attack Alerts</h2>
+                <table class="alerts-table" id="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Source IP</th>
+                            <th>Destination IP</th>
+                            <th>Protocol</th>
+                            <th>Attack Type</th>
+                            <th>Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody">
+                        <tr><td colspan="6" class="loading">No attacks detected yet...</td></tr>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+
+        <footer>
+            <p>NIDS Dashboard v2.0.0 | Real-Time Attack Detection | Last Updated: <span id="last-update">--:--:--</span></p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', path='/dashboard.js') }}"></script>
+</body>
+</html>

@@ -2,10 +2,13 @@
 FastAPI Dashboard for NIDS.
 
 Provides REST API endpoints to monitor alerts and system status.
+Database-backed persistent storage (integrates with Raspberry Pi NIDS).
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import sys
 import sqlite3
@@ -14,7 +17,12 @@ from datetime import datetime, timedelta
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.config import DASHBOARD_HOST, DASHBOARD_PORT, DATABASE_PATH
-from utils.helpers import log_runtime, load_json
+from utils.helpers import log_runtime
+from dashboard.database import Database
+
+BASE_DIR = Path(__file__).parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -23,12 +31,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# Initialize database
+db = Database(DATABASE_PATH)
+
 # Global state
 class SystemState:
     """Holds system state."""
-    alerts = []
-    stats = {}
     is_running = False
+    stats = {}
 
 state = SystemState()
 
@@ -38,6 +51,7 @@ async def root():
     return {
         "title": "NIDS Dashboard API",
         "endpoints": {
+            "/dashboard": "Visual monitoring dashboard",
             "/alerts": "Get recent alerts",
             "/alerts/summary": "Get alert summary",
             "/stats": "Get system statistics",
@@ -45,6 +59,18 @@ async def root():
             "/health": "System health check"
         }
     }
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    """Render the visual dashboard."""
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "request": request,
+            "title": "NIDS Command Center"
+        }
+    )
 
 @app.get("/health")
 async def health_check():
@@ -56,41 +82,21 @@ async def health_check():
     }
 
 @app.get("/alerts")
-async def get_alerts(limit: int = 20):
-    """Get recent alerts."""
+async def get_alerts(limit: int = 50):
+    """Get recent ATTACK alerts from database (filters out Benign traffic)."""
     try:
-        # Load alerts from database
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
+        # Get all recent alerts from database
+        all_alerts = db.get_recent_alerts(limit * 2)  # Get more to filter
         
-        cursor.execute("""
-            SELECT timestamp, src_ip, dst_ip, src_port, dst_port, 
-                   attack_type, confidence, protocol
-            FROM alerts
-            ORDER BY timestamp DESC
-            LIMIT ?
-        """, (limit,))
-        
-        rows = cursor.fetchall()
-        conn.close()
-        
-        alerts = [
-            {
-                "timestamp": row[0],
-                "src_ip": row[1],
-                "dst_ip": row[2],
-                "src_port": row[3],
-                "dst_port": row[4],
-                "attack_type": row[5],
-                "confidence": row[6],
-                "protocol": row[7]
-            }
-            for row in rows
-        ]
+        # Filter only attack alerts (exclude Benign)
+        attack_alerts = [
+            alert for alert in all_alerts 
+            if alert.get("attack_type", "").lower() != "benign"
+        ][:limit]
         
         return {
-            "count": len(alerts),
-            "alerts": alerts
+            "count": len(attack_alerts),
+            "alerts": attack_alerts
         }
         
     except Exception as e:
@@ -99,51 +105,71 @@ async def get_alerts(limit: int = 20):
 
 @app.get("/alerts/summary")
 async def get_alerts_summary():
-    """Get alert summary statistics."""
+    """Get alert summary statistics from database."""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
+        # Get summary from database
+        summary = db.get_alert_summary()
         
-        # Total alerts
-        cursor.execute("SELECT COUNT(*) FROM alerts")
-        total = cursor.fetchone()[0]
-        
-        # Alerts by type
-        cursor.execute("""
-            SELECT attack_type, COUNT(*) FROM alerts
-            GROUP BY attack_type
-        """)
-        
-        type_counts = {row[0]: row[1] for row in cursor.fetchall()}
+        # Only count attacks (exclude Benign)
+        attack_counts = {
+            k: v for k, v in summary['alerts_by_type'].items()
+            if k.lower() != 'benign'
+        }
         
         # Alerts last hour
-        one_hour_ago = (datetime.now() - timedelta(hours=1)).isoformat()
-        cursor.execute("SELECT COUNT(*) FROM alerts WHERE timestamp > ?", (one_hour_ago,))
-        last_hour = cursor.fetchone()[0]
-        
-        conn.close()
+        one_hour_ago = (datetime.now() - timedelta(hours=1))
+        recent_alerts = db.get_recent_alerts(1000)
+        last_hour = 0
+        for alert in recent_alerts:
+            try:
+                alert_time = datetime.fromisoformat(alert.get("timestamp", ""))
+                if alert_time > one_hour_ago and alert.get("attack_type", "").lower() != "benign":
+                    last_hour += 1
+            except:
+                pass
         
         return {
-            "total_alerts": total,
+            "total_alerts": sum(attack_counts.values()),
             "alerts_last_hour": last_hour,
-            "alerts_by_type": type_counts
+            "alerts_by_type": attack_counts
         }
         
     except Exception as e:
         log_runtime(f"Error fetching summary: {e}", "ERROR")
-        return {"error": str(e)}
+        return {"total_alerts": 0, "alerts_last_hour": 0, "alerts_by_type": {}}
 
 @app.get("/stats")
 async def get_statistics():
-    """Get system statistics."""
-    return {
-        "timestamp": datetime.now().isoformat(),
-        "is_running": state.is_running,
-        "packets_processed": state.stats.get("packets_processed", 0),
-        "active_flows": state.stats.get("active_flows", 0),
-        "total_alerts": state.stats.get("total_alerts", 0),
-        "inference_ready": state.stats.get("inference_ready", False)
-    }
+    """Get system statistics with attack data for charts from database."""
+    try:
+        # Get attack statistics from database
+        stats_data = db.get_attack_statistics()
+        
+        # Alerts last hour
+        one_hour_ago = (datetime.now() - timedelta(hours=1))
+        recent_alerts = db.get_recent_alerts(1000)
+        last_hour = 0
+        for alert in recent_alerts:
+            try:
+                alert_time = datetime.fromisoformat(alert.get("timestamp", ""))
+                if alert_time > one_hour_ago and alert.get("attack_type", "").lower() != "benign":
+                    last_hour += 1
+            except:
+                pass
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "total_attack_alerts": stats_data['total_attack_alerts'],
+            "alerts_last_hour": last_hour,
+            "attack_type_distribution": stats_data['attack_type_distribution'],
+            "severity_distribution": stats_data['severity_distribution'],
+            "protocol_distribution": stats_data['protocol_distribution'],
+            "active_flows": state.stats.get("active_flows", 0),
+            "packets_processed": state.stats.get("packets_processed", 0)
+        }
+    except Exception as e:
+        log_runtime(f"Error fetching statistics: {e}", "ERROR")
+        return {"error": str(e)}
 
 @app.get("/flows")
 async def get_active_flows():
@@ -159,30 +185,16 @@ async def get_active_flows():
 
 @app.post("/alerts")
 async def create_alert(alert_data: dict):
-    """Create a new alert."""
+    """Create a new alert and store in database (from Raspberry Pi NIDS)."""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
+        # Insert alert into database
+        alert_id = db.insert_alert(alert_data)
         
-        cursor.execute("""
-            INSERT INTO alerts 
-            (timestamp, src_ip, dst_ip, src_port, dst_port, attack_type, confidence, protocol)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            alert_data["timestamp"],
-            alert_data["src_ip"],
-            alert_data["dst_ip"],
-            alert_data["src_port"],
-            alert_data["dst_port"],
-            alert_data["attack_type"],
-            alert_data["confidence"],
-            alert_data.get("protocol", "TCP")
-        ))
-        
-        conn.commit()
-        conn.close()
-        
-        return {"success": True}
+        if alert_id > 0:
+            log_runtime(f"Alert recorded: {alert_data.get('attack_type')} from {alert_data.get('src_ip')}")
+            return {"success": True, "alert_id": alert_id}
+        else:
+            raise Exception("Failed to insert alert")
         
     except Exception as e:
         log_runtime(f"Error creating alert: {e}", "ERROR")
@@ -194,14 +206,13 @@ async def get_configuration():
     return {
         "dashboard_host": DASHBOARD_HOST,
         "dashboard_port": DASHBOARD_PORT,
+        "storage_type": "SQLite Database (Persistent)",
         "database_path": str(DATABASE_PATH)
     }
 
-def setup_api(alerts_list: list = None, stats: dict = None):
+def setup_api(stats: dict = None):
     """Setup API with external state."""
     global state
-    if alerts_list:
-        state.alerts = alerts_list
     if stats:
         state.stats = stats
 

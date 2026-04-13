@@ -151,155 +151,94 @@ class Database:
             log_error("Failed to get recent alerts", e)
             return []
     
-    def get_alert_count(self) -> int:
-        """Get total alert count."""
+    def get_alert_summary(self) -> dict:
+        """Get alert summary statistics."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
+            # Total alerts
             cursor.execute("SELECT COUNT(*) FROM alerts")
-            count = cursor.fetchone()[0]
+            total = cursor.fetchone()[0]
+            
+            # Alerts by type
+            cursor.execute("""
+                SELECT attack_type, COUNT(*) FROM alerts
+                GROUP BY attack_type
+            """)
+            
+            type_counts = {row[0]: row[1] for row in cursor.fetchall()}
+            
             conn.close()
             
-            return count
+            return {
+                'total_alerts': total,
+                'alerts_by_type': type_counts
+            }
             
         except Exception as e:
-            log_error("Failed to get alert count", e)
-            return 0
+            log_error("Failed to get alert summary", e)
+            return {'total_alerts': 0, 'alerts_by_type': {}}
     
-    def get_alerts_by_type(self, attack_type: str, limit: int = 100) -> list:
-        """Get alerts by attack type."""
+    def get_attack_statistics(self) -> dict:
+        """Get detailed attack statistics for charts."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
+            # Only attack alerts (exclude Benign)
             cursor.execute("""
-                SELECT * FROM alerts
-                WHERE attack_type = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (attack_type, limit))
+                SELECT COUNT(*) FROM alerts
+                WHERE LOWER(attack_type) != 'benign'
+            """)
+            total_attacks = cursor.fetchone()[0]
             
-            rows = cursor.fetchall()
-            conn.close()
-            
-            return rows
-            
-        except Exception as e:
-            log_error("Failed to get alerts by type", e)
-            return []
-    
-    def get_top_sources(self, limit: int = 10) -> list:
-        """Get top source IPs by alert count."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
+            # Attack counts by type
             cursor.execute("""
-                SELECT src_ip, COUNT(*) as count
+                SELECT attack_type, COUNT(*) FROM alerts
+                WHERE LOWER(attack_type) != 'benign'
+                GROUP BY attack_type
+            """)
+            attack_type_counts = {row[0]: row[1] for row in cursor.fetchall()}
+            
+            # Severity distribution
+            cursor.execute("""
+                SELECT 
+                    SUM(CASE WHEN confidence >= 0.8 THEN 1 ELSE 0 END) as high,
+                    SUM(CASE WHEN confidence >= 0.5 AND confidence < 0.8 THEN 1 ELSE 0 END) as medium,
+                    SUM(CASE WHEN confidence < 0.5 THEN 1 ELSE 0 END) as low
                 FROM alerts
-                GROUP BY src_ip
-                ORDER BY count DESC
-                LIMIT ?
-            """, (limit,))
+                WHERE LOWER(attack_type) != 'benign'
+            """)
+            row = cursor.fetchone()
+            severity = {
+                'high': row[0] or 0,
+                'medium': row[1] or 0,
+                'low': row[2] or 0
+            }
             
-            rows = cursor.fetchall()
-            conn.close()
-            
-            return [(row[0], row[1]) for row in rows]
-            
-        except Exception as e:
-            log_error("Failed to get top sources", e)
-            return []
-    
-    def insert_statistics(self, stats_dict: dict) -> None:
-        """Insert statistics record."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
+            # Protocol distribution
             cursor.execute("""
-                INSERT INTO statistics
-                (timestamp, packets_processed, active_flows, total_alerts)
-                VALUES (?, ?, ?, ?)
-            """, (
-                stats_dict.get('timestamp', datetime.now().isoformat()),
-                stats_dict.get('packets_processed', 0),
-                stats_dict.get('active_flows', 0),
-                stats_dict.get('total_alerts', 0)
-            ))
+                SELECT protocol, COUNT(*) FROM alerts
+                WHERE LOWER(attack_type) != 'benign'
+                GROUP BY protocol
+            """)
+            protocol_counts = {row[0]: row[1] for row in cursor.fetchall()}
             
-            conn.commit()
             conn.close()
             
-        except Exception as e:
-            log_error("Failed to insert statistics", e)
-    
-    def get_statistics(self, limit: int = 100) -> list:
-        """Get statistics history."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                SELECT id, timestamp, packets_processed, active_flows, total_alerts
-                FROM statistics
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (limit,))
-            
-            rows = cursor.fetchall()
-            conn.close()
-            
-            return rows
+            return {
+                'total_attack_alerts': total_attacks,
+                'attack_type_distribution': attack_type_counts,
+                'severity_distribution': severity,
+                'protocol_distribution': protocol_counts
+            }
             
         except Exception as e:
-            log_error("Failed to get statistics", e)
-            return []
-    
-    def clear_old_alerts(self, days: int = 30) -> int:
-        """Delete alerts older than specified days."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                DELETE FROM alerts
-                WHERE datetime(timestamp) < datetime('now', ? || ' days')
-            """, (f"-{days}",))
-            
-            conn.commit()
-            deleted = cursor.rowcount
-            conn.close()
-            
-            log_runtime(f"Deleted {deleted} old alerts")
-            return deleted
-            
-        except Exception as e:
-            log_error("Failed to clear old alerts", e)
-            return 0
-    
-    def export_alerts(self, output_file: Path, format: str = 'csv') -> None:
-        """Export alerts to file."""
-        try:
-            alerts = self.get_recent_alerts(limit=10000)
-            
-            if format == 'csv':
-                import csv
-                
-                with open(output_file, 'w', newline='') as f:
-                    if alerts:
-                        writer = csv.DictWriter(f, fieldnames=alerts[0].keys())
-                        writer.writeheader()
-                        writer.writerows(alerts)
-            
-            elif format == 'json':
-                import json
-                
-                with open(output_file, 'w') as f:
-                    json.dump(alerts, f, indent=4)
-            
-            log_runtime(f"Exported {len(alerts)} alerts to {output_file}")
-            
-        except Exception as e:
-            log_error(f"Failed to export alerts", e)
+            log_error("Failed to get attack statistics", e)
+            return {
+                'total_attack_alerts': 0,
+                'attack_type_distribution': {},
+                'severity_distribution': {'high': 0, 'medium': 0, 'low': 0},
+                'protocol_distribution': {}
+            }
