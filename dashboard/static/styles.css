@@ -360,3 +360,163 @@ footer {
 .warning {
     color: var(--warning-color);
 }
+
+/* ── NIPS: firewall blocks ─────────────────────────────────── */
+.firewall-section {
+    border-left-color: var(--danger-color);
+}
+
+.section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.section-head h2 {
+    margin-bottom: 0;
+}
+
+.mode-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.9em;
+    letter-spacing: 0.5px;
+    background-color: #cccccc;
+    color: #333333;
+}
+
+.mode-badge.mode-enforce {
+    background-color: var(--danger-color);
+    color: #ffffff;
+}
+
+.mode-badge.mode-dry-run {
+    background-color: #7a4fd6;
+    color: #ffffff;
+}
+
+.mode-badge.mode-off {
+    background-color: #888888;
+    color: #ffffff;
+}
+
+.firewall-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.fw-stat {
+    background-color: var(--light-bg);
+    border-radius: 6px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fw-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--primary-color);
+    word-break: break-all;
+}
+
+.fw-value.danger {
+    color: var(--danger-color);
+}
+
+.fw-value.fw-chain {
+    font-size: 1.2em;
+    font-family: Consolas, 'Courier New', monospace;
+}
+
+.fw-label {
+    color: #999;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.fw-note {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.attacker-ip {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+/* Newly blocked attacker: flash so the examiner notices it */
+@keyframes block-flash {
+    0%   { background-color: rgba(204, 0, 0, 0.35); }
+    100% { background-color: transparent; }
+}
+
+.alerts-table tbody tr.new-block {
+    animation: block-flash 2.5s ease-out;
+}
+
+/* Prevention outcome badges */
+.status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    color: #ffffff;
+    background-color: #888888;
+}
+
+.status-badge.status-blocked { background-color: var(--danger-color); }
+.status-badge.status-detected { background-color: #ff9900; }
+.status-badge.status-whitelisted { background-color: var(--primary-color); }
+.status-badge.status-dry-run { background-color: #7a4fd6; }
+.status-badge.status-block-failed { background-color: #333333; }
+.status-badge.status-unknown { background-color: #aaaaaa; }
+
+.engine-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: bold;
+    border: 1px solid var(--border-color);
+    color: #555555;
+}
+
+.engine-tag.engine-rule { border-color: #0066cc; color: #0066cc; }
+.engine-tag.engine-ml { border-color: #7a4fd6; color: #7a4fd6; }
+
+/* Confidence pill in the alerts table. Without this the generic .danger
+   text colour made the text invisible on the red background. */
+.confidence-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.confidence-badge.danger,
+.confidence-badge.warning {
+    color: #ffffff;
+}
+
+.confidence-badge.success {
+    color: #333333;
+}

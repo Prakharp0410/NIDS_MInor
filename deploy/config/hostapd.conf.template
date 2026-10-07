@@ -1,0 +1,31 @@
+# Edge-AI Sentinel Wi-Fi access point.
+# Rendered by deploy/scripts/install.sh into /etc/hostapd/hostapd.conf.
+interface=@LAN_IF@
+driver=nl80211
+ctrl_interface=/var/run/hostapd
+ctrl_interface_group=0
+
+# Radio: 2.4 GHz, because most IoT devices have no 5 GHz radio
+ssid=@SSID@
+utf8_ssid=1
+country_code=@COUNTRY@
+ieee80211d=1
+hw_mode=g
+channel=@CHANNEL@
+ieee80211n=1
+wmm_enabled=1
+
+# Security: WPA2-Personal with CCMP (AES), the level IoT devices support
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+wpa_passphrase=@PASSPHRASE@
+ignore_broadcast_ssid=0
+macaddr_acl=0
+
+# Client isolation: Wi-Fi devices cannot reach each other directly over the
+# air. Together with proxy_arp_pvlan (sysctl), every client-to-client packet
+# is routed through the Pi, so the NIPS sees it and iptables can drop it.
+# Without this an attacker on the Wi-Fi could hit a victim invisibly.
+ap_isolate=1

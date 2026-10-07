@@ -1,0 +1,29 @@
+# Edge-AI Sentinel: packet capture, detection and the iptables kill-switch.
+[Unit]
+Description=Edge-AI Sentinel NIPS engine (capture, detection, iptables kill-switch)
+After=edge-sentinel-gateway.service hostapd.service network.target
+Wants=edge-sentinel-gateway.service hostapd.service
+# Never give up restarting: a security appliance must come back on its own.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Root is required for raw packet capture (Scapy) and for iptables.
+User=root
+WorkingDirectory=@APP_DIR@
+Environment=PYTHONUNBUFFERED=1
+Environment=EDGE_LAN_IF=@LAN_IF@
+EnvironmentFile=-/etc/edge-sentinel/edge-sentinel.env
+ExecStart="@PYTHON@" @APP_DIR@/raspberry_pi/main.py --interface ${EDGE_LAN_IF} --mode continuous
+# Crash-loop backoff: retry after 3 s, growing to 60 s if it keeps failing.
+# RestartSteps/RestartMaxDelaySec need systemd 254+; older systemd (e.g.
+# Raspberry Pi OS Bookworm) logs "Unknown key" and keeps the fixed 3 s delay.
+Restart=always
+RestartSec=3
+RestartSteps=5
+RestartMaxDelaySec=60
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

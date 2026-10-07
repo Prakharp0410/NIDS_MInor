@@ -1,0 +1,17 @@
+# Edge-AI Sentinel: one-shot gateway bring-up at boot.
+# Gives @LAN_IF@ its static address, enables routing and applies the firewall
+# baseline (NAT + the NIPS block chain) before the access point starts.
+[Unit]
+Description=Edge-AI Sentinel gateway bring-up (address, routing, NAT, NIPS chain)
+After=sys-subsystem-net-devices-@LAN_IF@.device
+BindsTo=sys-subsystem-net-devices-@LAN_IF@.device
+Before=hostapd.service dnsmasq.service edge-sentinel-engine.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=-/etc/edge-sentinel/edge-sentinel.env
+ExecStart=/bin/bash @APP_DIR@/deploy/scripts/gateway_up.sh
+
+[Install]
+WantedBy=multi-user.target

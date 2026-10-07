@@ -1,7 +1,8 @@
-// NIDS Dashboard JavaScript with Chart.js
+// Edge-AI Sentinel NIPS Dashboard JavaScript with Chart.js
 
 const API_BASE = '/api' || '';
 let charts = {}; // Store chart instances for updates
+let knownBlockedIps = null; // IPs already shown, to highlight new blocks
 
 // Initialize dashboard on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,6 +10,10 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDashboard();
     // Refresh data every 5 seconds for real-time updates
     setInterval(updateDashboard, 5000);
+    // Firewall blocks refresh faster: the examiner should see a block appear
+    // within moments of the attack starting
+    updateBlockedThreats();
+    setInterval(updateBlockedThreats, 2000);
 });
 
 // Main update function
@@ -252,41 +257,143 @@ async function updateRecentAlerts() {
         const tbody = document.getElementById('alerts-tbody');
         
         if (!data.alerts || data.alerts.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">No attacks detected yet - system is secure</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">No attacks detected yet - system is secure</td></tr>';
             return;
         }
-        
+
         let html = '';
         data.alerts.forEach(alert => {
             const timestamp = new Date(alert.timestamp);
             const confidence = parseFloat(alert.confidence * 100).toFixed(1);
-            
+
             let severityClass = 'success';
             if (confidence >= 80) severityClass = 'danger';
             else if (confidence >= 50) severityClass = 'warning';
-            
+
             html += `
                 <tr>
-                    <td>${timestamp.toLocaleString()}</td>
-                    <td><code>${alert.src_ip}</code></td>
-                    <td><code>${alert.dst_ip}</code></td>
-                    <td>${alert.protocol || 'N/A'}</td>
-                    <td><strong>${alert.attack_type}</strong></td>
+                    <td>${escapeHtml(timestamp.toLocaleString())}</td>
+                    <td><code>${escapeHtml(alert.src_ip)}</code></td>
+                    <td><code>${escapeHtml(alert.dst_ip)}</code></td>
+                    <td>${escapeHtml(alert.protocol || 'N/A')}</td>
+                    <td><strong>${escapeHtml(alert.attack_type)}</strong></td>
+                    <td>${engineTag(alert.detector)}</td>
                     <td>
                         <span class="confidence-badge ${severityClass}" style="background-color: ${getConfidenceColor(confidence)}">
                             ${confidence}%
                         </span>
                     </td>
+                    <td>${statusBadge(alert.status)}</td>
                 </tr>
             `;
         });
-        
+
         tbody.innerHTML = html;
     } catch (error) {
         console.error('Error fetching recent alerts:', error);
-        document.getElementById('alerts-tbody').innerHTML = 
-            '<tr><td colspan="6" class="loading">Error loading alerts</td></tr>';
+        document.getElementById('alerts-tbody').innerHTML =
+            '<tr><td colspan="8" class="loading">Error loading alerts</td></tr>';
     }
+}
+
+// ── NIPS: active firewall blocks ─────────────────────────────
+async function updateBlockedThreats() {
+    try {
+        const response = await fetch('/blocked_threats');
+        const data = await response.json();
+
+        document.getElementById('blocked-count').textContent = data.count || 0;
+        document.getElementById('dropped-total').textContent =
+            data.total_dropped_packets == null ? '-' : data.total_dropped_packets.toLocaleString();
+        document.getElementById('fw-chain').textContent = data.chain || '-';
+        renderModeBadge(data.mode, data.firewall_visible);
+
+        const tbody = document.getElementById('blocked-tbody');
+        const blocks = data.blocked || [];
+        const seenBefore = knownBlockedIps;
+        knownBlockedIps = new Set(blocks.map(b => b.ip));
+
+        if (blocks.length === 0) {
+            const idle = data.mode === 'enforce'
+                ? 'No active blocks - network is clean'
+                : 'No active blocks - prevention is not enforcing';
+            tbody.innerHTML = `<tr><td colspan="9" class="loading">${idle}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = blocks.map(block => {
+            // Highlight rows that appeared since the previous refresh
+            const isNew = seenBefore !== null && !seenBefore.has(block.ip);
+            const confidence = block.confidence == null
+                ? '-' : `${(block.confidence * 100).toFixed(1)}%`;
+            const latency = block.block_latency_ms == null
+                ? '-' : `${block.block_latency_ms.toFixed(1)} ms`;
+            const dropped = block.dropped_packets == null
+                ? '-' : block.dropped_packets.toLocaleString();
+            return `
+                <tr class="${isNew ? 'new-block' : ''}">
+                    <td><code class="attacker-ip">${escapeHtml(block.ip)}</code></td>
+                    <td><code>${escapeHtml(block.target_ip || '-')}</code></td>
+                    <td><strong>${escapeHtml(block.attack_type)}</strong></td>
+                    <td>${engineTag(block.detector)}</td>
+                    <td>${confidence}</td>
+                    <td>${escapeHtml(block.blocked_at)}</td>
+                    <td>${latency}</td>
+                    <td>${dropped}</td>
+                    <td>${kernelRuleBadge(block.enforced)}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error fetching blocked threats:', error);
+    }
+}
+
+function renderModeBadge(mode, firewallVisible) {
+    const badge = document.getElementById('nips-mode-badge');
+    const note = document.getElementById('fw-note');
+    badge.className = 'mode-badge';
+    if (mode === 'enforce') {
+        badge.classList.add('mode-enforce');
+        badge.textContent = 'Prevention: ENFORCING';
+        note.textContent = firewallVisible
+            ? 'Attackers are dropped by the Linux kernel (iptables) the moment they are classified.'
+            : 'Kernel firewall state is not readable by the dashboard (run it as root on the Pi to verify rules and drop counters).';
+    } else if (mode === 'dry-run') {
+        badge.classList.add('mode-dry-run');
+        badge.textContent = 'Prevention: DRY-RUN';
+        note.textContent = 'Dry-run: attacks are flagged as DRY_RUN but no traffic is blocked.';
+    } else {
+        badge.classList.add('mode-off');
+        badge.textContent = 'Prevention: OFF';
+        note.textContent = 'Prevention is off: the system only detects (NIDS mode).';
+    }
+}
+
+function statusBadge(status) {
+    const value = status || 'DETECTED';
+    const css = value.toLowerCase().replace(/_/g, '-');
+    return `<span class="status-badge status-${escapeHtml(css)}">${escapeHtml(value.replace(/_/g, ' '))}</span>`;
+}
+
+function engineTag(detector) {
+    const value = (detector || 'UNKNOWN').toUpperCase();
+    return `<span class="engine-tag engine-${escapeHtml(value.toLowerCase())}">${escapeHtml(value)}</span>`;
+}
+
+function kernelRuleBadge(enforced) {
+    if (enforced === true) return '<span class="status-badge status-blocked">ACTIVE</span>';
+    if (enforced === false) return '<span class="status-badge status-block-failed">MISSING</span>';
+    return '<span class="status-badge status-unknown">UNVERIFIED</span>';
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // Get color based on confidence level

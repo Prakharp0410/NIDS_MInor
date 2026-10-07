@@ -1,0 +1,16 @@
+# Edge-AI Sentinel kernel settings.
+# Rendered by deploy/scripts/install.sh into /etc/sysctl.d/90-edge-sentinel.conf.
+# A sysctl.d drop-in is used rather than /etc/sysctl.conf because recent
+# Debian releases no longer read /etc/sysctl.conf at boot.
+
+# Route between the Wi-Fi LAN and the Ethernet uplink
+net.ipv4.ip_forward = 1
+
+# Answer ARP for other Wi-Fi clients with the Pi's own MAC (pairs with
+# hostapd ap_isolate=1), so client-to-client traffic is routed via the Pi
+net.ipv4.conf.@LAN_IF@.proxy_arp_pvlan = 1
+net.ipv4.neigh.@LAN_IF@.proxy_delay = 0
+
+# Never tell clients to bypass the Pi with ICMP redirects
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.@LAN_IF@.send_redirects = 0

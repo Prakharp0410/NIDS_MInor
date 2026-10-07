@@ -1,0 +1,15 @@
+# Runtime packages for the Raspberry Pi: detection engine, dashboard and tests.
+# Install with:  venv/bin/pip install -r requirements-pi.txt
+# Training and the notebooks need the full requirements.txt instead.
+
+numpy>=2.0,<3          # the saved model needs numpy 2 (it references numpy._core)
+scikit-learn==1.6.1    # exact version the Random Forest was saved with
+joblib>=1.2
+scapy>=2.5             # packet capture
+fastapi>=0.100         # dashboard API
+uvicorn>=0.23          # dashboard server
+jinja2>=3.0            # dashboard HTML template
+
+# Tests (venv/bin/python -m pytest -q)
+pytest>=7.0
+httpx>=0.24

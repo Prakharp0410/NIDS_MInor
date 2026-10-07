@@ -3,26 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NIDS Dashboard - Network Intrusion Detection System</title>
+    <title>Edge-AI Sentinel - Network Intrusion Prevention System</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🛡️ Network Intrusion Detection System - Dashboard</h1>
-            <p>Real-time Attack Detection & Threat Analysis</p>
+            <h1>🛡️ Edge-AI Sentinel - Network Intrusion Prevention System</h1>
+            <p>Real-time attack detection with automatic firewall blocking at the edge</p>
         </header>
 
         <nav class="navbar">
             <ul>
                 <li><a href="#dashboard">Dashboard</a></li>
+                <li><a href="#firewall">Firewall</a></li>
                 <li><a href="#alerts">Alerts</a></li>
                 <li><a href="#stats">Statistics</a></li>
             </ul>
         </nav>
 
-        <main>
+        <main id="dashboard">
             <!-- Health Status -->
             <section class="card health-card">
                 <h2>System Status</h2>
@@ -57,8 +58,51 @@
                 </div>
             </section>
 
+            <!-- NIPS: Active Firewall Blocks -->
+            <section class="card firewall-section" id="firewall">
+                <div class="section-head">
+                    <h2>Active Firewall Blocks</h2>
+                    <span class="mode-badge" id="nips-mode-badge">Prevention: ...</span>
+                </div>
+                <div class="firewall-summary">
+                    <div class="fw-stat">
+                        <span class="fw-value danger" id="blocked-count">0</span>
+                        <span class="fw-label">Attackers blocked</span>
+                    </div>
+                    <div class="fw-stat">
+                        <span class="fw-value" id="dropped-total">-</span>
+                        <span class="fw-label">Attack packets dropped</span>
+                    </div>
+                    <div class="fw-stat">
+                        <span class="fw-value fw-chain" id="fw-chain">-</span>
+                        <span class="fw-label">iptables chain</span>
+                    </div>
+                </div>
+                <p class="fw-note" id="fw-note"></p>
+                <div class="table-wrap">
+                    <table class="alerts-table blocked-table">
+                        <thead>
+                            <tr>
+                                <th>Attacker IP</th>
+                                <th>Target</th>
+                                <th>Attack Type</th>
+                                <th>Engine</th>
+                                <th>Confidence</th>
+                                <th>Blocked At</th>
+                                <th>Block Time</th>
+                                <th>Dropped Packets</th>
+                                <th>Kernel Rule</th>
+                            </tr>
+                        </thead>
+                        <tbody id="blocked-tbody">
+                            <tr><td colspan="9" class="loading">No active blocks - network is clean</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- Charts Section -->
-            <section id="charts-section" class="charts-section">
+            <section id="stats" class="charts-section">
                 <div class="charts-grid">
                     <div class="card chart-card">
                         <h2>Attack Type Distribution</h2>
@@ -76,28 +120,32 @@
             </section>
 
             <!-- Recent Alerts Table -->
-            <section class="card alerts-section">
+            <section class="card alerts-section" id="alerts">
                 <h2>Recent Attack Alerts</h2>
-                <table class="alerts-table" id="alerts-table">
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Source IP</th>
-                            <th>Destination IP</th>
-                            <th>Protocol</th>
-                            <th>Attack Type</th>
-                            <th>Confidence</th>
-                        </tr>
-                    </thead>
-                    <tbody id="alerts-tbody">
-                        <tr><td colspan="6" class="loading">No attacks detected yet...</td></tr>
-                    </tbody>
-                </table>
+                <div class="table-wrap">
+                    <table class="alerts-table" id="alerts-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Source IP</th>
+                                <th>Destination IP</th>
+                                <th>Protocol</th>
+                                <th>Attack Type</th>
+                                <th>Engine</th>
+                                <th>Confidence</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-tbody">
+                            <tr><td colspan="8" class="loading">No attacks detected yet...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
         </main>
 
         <footer>
-            <p>NIDS Dashboard v2.0.0 | Real-Time Attack Detection | Last Updated: <span id="last-update">--:--:--</span></p>
+            <p>Edge-AI Sentinel NIPS Dashboard v3.0.0 | Real-Time Attack Prevention | Last Updated: <span id="last-update">--:--:--</span></p>
         </footer>
     </div>
 

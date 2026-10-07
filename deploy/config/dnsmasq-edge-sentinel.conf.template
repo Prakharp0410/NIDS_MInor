@@ -1,0 +1,25 @@
+# Edge-AI Sentinel DHCP + DNS for the Wi-Fi network.
+# Rendered by deploy/scripts/install.sh into /etc/dnsmasq.d/edge-sentinel.conf.
+
+# Serve only the access point. bind-dynamic copes with wlan0 getting its
+# address after dnsmasq starts; skipping lo avoids clashing with any local
+# resolver on the Pi itself.
+interface=@LAN_IF@
+except-interface=lo
+bind-dynamic
+
+# DHCP pool for IoT devices; the Pi is their router and DNS server
+dhcp-authoritative
+dhcp-range=@DHCP_START@,@DHCP_END@,@NETMASK@,12h
+dhcp-option=option:router,@LAN_IP@
+dhcp-option=option:dns-server,@LAN_IP@
+
+# DNS forwarding: uses the resolvers eth0 learned (/etc/resolv.conf) plus
+# public fallbacks, so it works on campus networks that block outside DNS too
+domain-needed
+bogus-priv
+server=1.1.1.1
+server=8.8.8.8
+
+# Friendly name for the dashboard: http://sentinel.lan:@DASHBOARD_PORT@/dashboard
+host-record=sentinel.lan,@LAN_IP@

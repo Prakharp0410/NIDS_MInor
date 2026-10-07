@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, ATTACK_TYPES, DATASET_FILES, RANDOM_STATE
+from utils.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, ATTACK_TYPES, DATASET_FILES, RANDOM_STATE, normalize_label
 from utils.helpers import log_runtime, log_error
 
 class CICIDSDatasetLoader:
@@ -24,6 +24,7 @@ class CICIDSDatasetLoader:
         self.raw_data_dir = raw_data_dir
         self.processed_data_dir = processed_data_dir
         self.attack_types = ATTACK_TYPES
+        self.normalized_attack_types = {normalize_label(key): value for key, value in ATTACK_TYPES.items()}
         self.df = None
         self.label_column = None
         
@@ -63,8 +64,10 @@ class CICIDSDatasetLoader:
             raise
     
     def get_label(self, label_value: str) -> int:
-        """Convert label string to class ID."""
-        return self.attack_types.get(label_value, 0)
+        """Convert label string to class ID while tolerating capitalization and formatting differences."""
+        if label_value is None:
+            return 0
+        return self.normalized_attack_types.get(normalize_label(label_value), 0)
     
     def clean_data(self) -> pd.DataFrame:
         """Clean dataset."""

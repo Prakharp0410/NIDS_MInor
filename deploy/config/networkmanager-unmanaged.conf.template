@@ -1,0 +1,6 @@
+# Edge-AI Sentinel: hostapd owns @LAN_IF@ as an access point, so
+# NetworkManager must not try to join Wi-Fi networks with it.
+# Rendered by deploy/scripts/install.sh into
+# /etc/NetworkManager/conf.d/90-edge-sentinel.conf.
+[keyfile]
+unmanaged-devices=interface-name:@LAN_IF@

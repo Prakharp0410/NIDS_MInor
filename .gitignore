@@ -1,0 +1,13 @@
+# Python build files
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+nids_env/
+
+# Runtime data written by the engine and dashboard (created on first run)
+logs/
+alerts.db

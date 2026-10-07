@@ -20,6 +20,26 @@ A lightweight, machine learning-based network intrusion detection system designe
 - ✅ FastAPI web dashboard for monitoring
 - ✅ Modular, production-quality Python code
 - ✅ Optimized for Raspberry Pi resource constraints
+- ✅ **NIPS mode:** the Pi runs as a Wi-Fi gateway and drops attackers with iptables the moment they are classified
+- ✅ Plug-and-play: hostapd, dnsmasq, NAT and the engine and dashboard start automatically at boot
+
+## NIPS Gateway (Phase 2)
+
+The Pi can run as an inline Intrusion Prevention System. Internet comes in on
+Ethernet (`eth0`), IoT devices join the Pi's own Wi-Fi (`wlan0`), and every
+packet between them passes through the detection engine. When an attack is
+classified, `raspberry_pi/firewall.py` inserts an iptables DROP rule for the
+attacker into a dedicated `EDGE_SENTINEL` chain. The dashboard shows each block
+live, with the kernel's dropped-packet counter as proof.
+
+```bash
+sudo bash deploy/scripts/install.sh   # one time, then: sudo reboot
+sudo edge-sentinel-reset              # between demonstration runs
+```
+
+On the Pi, install the slim runtime packages with
+`pip install -r requirements-pi.txt`. Installation, the demo walkthrough,
+configuration and troubleshooting are in [deploy/README.md](deploy/README.md).
 
 ## Project Structure
 
@@ -41,12 +61,19 @@ nids-project/
 │   ├── flow_manager.py      # Flow aggregation
 │   ├── feature_extractor.py # Feature extraction
 │   ├── inference.py         # ML inference
-│   ├── alert_system.py      # Alert generation
+│   ├── alert_system.py      # Alert generation + NIPS kill-switch trigger
+│   ├── firewall.py          # iptables kill-switch (NIPS)
 │   ├── logger.py            # Logging
 │   └── main.py              # Runtime orchestration
 ├── dashboard/
 │   ├── api.py               # FastAPI endpoints
 │   └── database.py          # SQLite database management
+├── deploy/
+│   ├── config/              # hostapd, dnsmasq, sysctl templates
+│   ├── systemd/             # gateway, engine, dashboard services
+│   ├── scripts/             # install.sh, gateway_up.sh, reset_firewall.sh
+│   └── README.md            # NIPS deployment and demo guide
+├── tests/                   # pytest suite
 ├── models/
 │   ├── model.joblib         # Trained Random Forest model
 │   ├── scaler.joblib        # Feature scaler
@@ -56,7 +83,8 @@ nids-project/
 │   ├── helpers.py           # Utility functions
 │   └── __init__.py
 ├── logs/                    # Runtime logs and alerts
-├── requirements.txt         # Python dependencies
+├── requirements.txt         # Python dependencies (training + runtime)
+├── requirements-pi.txt      # Runtime-only dependencies for the Pi
 └── README.md               # This file
 ```
 
@@ -292,6 +320,7 @@ API Endpoints:
 | `/health` | GET | System health status |
 | `/alerts` | GET | Get recent alerts (limit param) |
 | `/alerts/summary` | GET | Alert statistics |
+| `/blocked_threats` | GET | IPs blocked by the NIPS firewall, verified against iptables |
 | `/stats` | GET | System statistics |
 | `/flows` | GET | Active network flows |
 | `/config` | GET | System configuration |

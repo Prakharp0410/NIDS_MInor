@@ -3,8 +3,8 @@
 
 # Core Data Science & ML
 pandas>=1.3.0
-numpy>=1.21.0
-scikit-learn>=1.0.0
+numpy>=2.0,<3          # the saved model needs numpy 2 (it references numpy._core)
+scikit-learn==1.6.1    # exact version the Random Forest was saved with
 joblib>=1.0.0
 
 # Network packet processing
@@ -15,6 +15,7 @@ pyshark>=0.6
 fastapi>=0.68.0
 uvicorn>=0.15.0
 pydantic>=1.8.0
+jinja2>=3.0           # dashboard HTML templates
 
 # Database (sqlite3 is built into Python - no install needed)
 
@@ -28,6 +29,7 @@ seaborn>=0.11.0
 
 # Development
 pytest>=6.2.0
+httpx>=0.24           # FastAPI TestClient in tests/
 black>=21.0
 flake8>=3.9.0
 
