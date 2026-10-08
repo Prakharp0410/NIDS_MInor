@@ -1,6 +1,7 @@
+import pytest
+
 from utils.config import ATTACK_TYPES, CLASS_LABELS
 from utils.helpers import get_class_label
-from training.dataset_loader import CICIDSDatasetLoader
 
 
 def test_class_labels_are_consistent():
@@ -20,6 +21,11 @@ def test_class_labels_are_consistent():
 
 
 def test_attack_type_normalization_handles_dataset_labels():
+    # The training loader needs pandas, which the Pi's slim
+    # requirements-pi.txt leaves out; skip there instead of failing collection.
+    pytest.importorskip("pandas")
+    from training.dataset_loader import CICIDSDatasetLoader
+
     loader = CICIDSDatasetLoader()
 
     assert loader.get_label("BENIGN") == 0
